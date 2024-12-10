@@ -31,8 +31,8 @@
 	#define XFileOpen(fp, flags, mode)		(CreateFileA((fp), (flags), 0x0, NULL, (mode) ?: 0x3, 0x80, (dev_t)NULL))
 	#define XFileClose(fd) 					(CloseHandle((fd)))
 
-	#define XFileRead(fd, buf, cnt, cnto) 	((void)ReadFile((fd), (buf), (cnt), (uint32_t*)(cnto), NULL))
-	#define XFileWrite(fd, buf, cnt, cnto)	((void)WriteFile((fd), (buf), (cnt), (uint32_t*)(cnto), NULL))
+	#define XFileRead(fd, buf, cnt, cnto) 	(ReadFile((fd), (buf), (cnt), (uint32_t*)(cnto), NULL))
+	#define XFileWrite(fd, buf, cnt, cnto)	(WriteFile((fd), (buf), (cnt), (uint32_t*)(cnto), NULL))
 #else
 	#include <xstd/System/SystemCall.h>
 
@@ -59,17 +59,27 @@
 	#define XFileOpen(fp, flags, mode)		((dev_t)syscall3(SYS_OPEN, (fp), (flags) | (mode), 0666))
 	#define XFileClose(fd)					(syscall1(SYS_CLOSE, (fd)))
 
-	#define XFileRead(fd, buf, cnt, cnto) do { \
-		size_t __ret = (size_t)syscall3(SYS_READ, (fd), (buf), (cnt)); \
-		size_t *out = (size_t*)(cnto); \
-		if (__ret && out) \
-			*out = __ret; \
-	} while (0)
+	static XFINL bool_t XFileRead(dev_t fd, ptr_t buf, size_t len, size_t *out) {
+		size_t recv = (size_t)syscall3(SYS_READ, fd, buf, len);
+		if (recv != -1ULL) {
+			if (out)
+				*out = recv;
 
-	#define XFileWrite(fd, buf, cnt, cnto) do { \
-		size_t __ret = (size_t)syscall3(SYS_WRITE, (fd), (buf), (cnt)); \
-		size_t *out = (size_t*)(cnto); \
-		if (__ret && out) \
-			*out = __ret; \
-	} while (0)
+			return true;
+		}
+
+		return false;
+	}
+
+	static XFINL bool_t XFileWrite(dev_t fd, ptr_t buf, size_t len, size_t *out) {
+		size_t written = (size_t)syscall3(SYS_WRITE, fd, buf, len);
+		if (written != -1ULL) {
+			if (out)
+				*out = written;
+
+			return true;
+		}
+
+		return false;
+	}
 #endif
